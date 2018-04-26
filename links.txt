@@ -1,0 +1,9 @@
+http://aix1.uottawa.ca/~jkhoury/markov.htm
+https://en.wikipedia.org/wiki/Examples_of_Markov_chains
+https://www.123mylist.com/2017/03/predicting-car-brand-switching-behavior.html
+https://es.slideshare.net/AadityaKurundkar/markov-chain-analysis-applied-to-marketing
+http://setosa.io/ev/markov-chains/
+https://www.dartmouth.edu/~chance/teaching_aids/books_articles/probability_book/Chapter11.pdf
+https://archive.ama.org/archive/ResourceLibrary/JournalofMarketingResearch(JMR)/documents/6846796.pdf
+http://personal.psu.edu/jol2/course/stat416/notes/chap4.pdf
+https://cyberforce.be/2016/08/17/markov-models-detecting-malware-through-written-language-recognition/
