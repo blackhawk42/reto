@@ -1,12 +1,55 @@
 import numpy as np
+from numpy import linalg
+import matplotlib.pyplot as plt
+
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import filedialog
 
 import csv
-from pprint import pprint
+
+import sys
+import os
+import os.path
 
 NO_CAR = 'Sin carro'
 NO_CAR_EQUIVALENTS = ('No tengo carro', 'No tenía carro')
 
+def ensure_dir(directory):
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+
+def getInputPath():
+	filetypes = []
+
+	filetypes.append( ('Archivo CSV', '*.csv') )
+	title = 'Seleccione el archivo CSV'
+	
+	filetypes.append( ('Todos los archivos', '*') )
+	
+	
+	return filedialog.askopenfilename(initialdir=os.getcwd(),
+											title=title,
+											filetypes=filetypes)
+
+def near(a, b, rtol=1e-5, atol=1e-8):
+	return np.abs(a-b)<(atol+rtol*np.abs(b))
+
 if __name__ == '__main__':
+	mainWin = tk.Tk()
+	mainWin.withdraw()
+	
+	messagebox.showinfo('Archivo CSV', 'Por favor, seleccione el archivo CSV')
+	
+	# Archivo de trabajo
+	entradaPath = getInputPath()
+	
+	# Si es cancelado
+	if entradaPath == '':
+		messagebox.showerror('Cancelado', 'Operación cancelada. Saliendo')
+		sys.exit(0)
+	
+	matrix = None
 	
 	# Tabla de frecuencias. Basicamente, la llave es el "actual" (lo que
 	# llamamos "anterior" en la encuesta) y contiene una lista
@@ -22,7 +65,7 @@ if __name__ == '__main__':
 	marcasIndex = 0
 	marcas = {}
 	
-	with open('respuestas.csv', newline='', encoding='utf-8') as f:
+	with open(entradaPath, newline='', encoding='utf-8') as f:
 		reader = csv.reader(f)
 		
 		firstline = True
@@ -41,16 +84,12 @@ if __name__ == '__main__':
 				actual = row[1].strip()
 			
 			# Registrar la marca si no la aviamos visto antes
+			# Sólo registraremos las marcas en el "anterior", para evitar
+			# columnas que sumen a 0
 			try:
 				marcas[last]
 			except KeyError:
 				marcas[last] = marcasIndex
-				marcasIndex += 1
-			
-			try:
-				marcas[actual]
-			except KeyError:
-				marcas[actual] = marcasIndex
 				marcasIndex += 1
 			
 			
@@ -58,7 +97,8 @@ if __name__ == '__main__':
 			try:
 				# Agregamos el elemento actual a la lista de "siguientes"
 				# eslabones
-				frecuencias[last].append(actual)
+				if actual in marcas: # Dificil de evitar a este punto
+					frecuencias[last].append(actual)
 				
 				# Un KeyError significa que el elemento esta siendo puesto
 				# en el diccionario por primera vez. Lo preparamos poniendole
@@ -67,9 +107,14 @@ if __name__ == '__main__':
 			except KeyError:
 				frecuencias[last] = [actual]
 	
-	
-	pprint(marcas)
-	pprint(frecuencias)
+	# Reiniciamos la cuenta de marcas, para que solo tengan las que realmente hay
+	marcas = {}
+	indices = {}
+	marcasIndex = 0
+	for marca in frecuencias:
+		marcas[marca] = marcasIndex
+		indices[marcasIndex] = marca
+		marcasIndex += 1
 	
 	
 	matrix = np.zeros( (len(marcas), len(marcas)) )
@@ -95,5 +140,58 @@ if __name__ == '__main__':
 		except KeyError:
 			continue
 	
-	print(matrix)
+	
+	#-----------------------| Operaciones principales |----------------|
+	
+	messagebox.showinfo('Reporte', 'Por favor seleccione la carpeta en la que crear el reporte')
+	REPORT_ROOT = filedialog.askdirectory()
+	
+	if REPORT_ROOT == '':
+		saveMatrix(matrix, binaryMarkov=binaryMarkov)
+		sys.exit(0)
+		
+	
+	ensure_dir( os.path.join(REPORT_ROOT, 'img') )
+	
+	## Steady vector
+	
+	# Obtener el steady state de la mtriz. Si nuestro modelo de Markov es
+	# realmente estocastico, este tiende a ciertas probabilidades conforme
+	# avanzan los pasos. Esto se puede ver como resolver pM = p, donde M es
+	# la matriz de Markov y p = [x_1, x_2, x_3, ..., x_n] donde n es el numero
+	# de estados. Despues recodamos que sum(x_1, x_2, x_3, ..., x_n) = 1 y tenemos
+	# una bonita serie de ecuaciones perfectamente resolvibles. Esta es la
+	# forma mas simple de visualizarlo
+	#
+	# Por otro lado, y la version que se usa aqui, podemos simplemente verlo
+	# como el eigenvector de la matriz con eigenvalor 1. Se usa este
+	# metodo no porque no entendamos como hacerlo con el otro (como
+	# demuestra nuestra explicacion), simplemente porque numpy ya
+	# provee las operaciones para hacerlo eficientemente. Este codigo
+	# ya es lo suficientemente grande y ambriento de recursos como
+	# esta ahora, ni hablar de que pasara cuando se quieran usar *verdaderas*
+	# tablas de datos...
+	
+	#~ eig_out = linalg.eig(matrix)
+	
+	#~ # Es posible que, trabajando con datos reales, no tengamos un valor 1.
+	#~ # Esto arma un "rango de error" de +/-0.1
+	#~ idx_vec = np.where(np.abs(eig_out[0] - 1) < 0.1)
+	
+	#~ # steady vector
+	#~ steady_vector = eig_out[1][:,idx_vec].flatten()
+	
+	D, V = linalg.eig(matrix)
+	
+	V = V.T
+	
+	for val, vec in zip(D, V):
+		assert np.allclose(np.dot(matrix, vec), val*vec)
+	
+	steady_vector = V[near(D, 1.0)][0]
+	
+	plt.pie(steady_vector, labels=sorted(marcas, key=lambda marca: marcas[marca]), autopct='%1.1f%%')
+	plt.savefig( os.path.join(REPORT_ROOT, 'img', 'alalarga.png') )
+	
+	
 	
