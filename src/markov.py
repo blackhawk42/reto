@@ -8,6 +8,9 @@ from tkinter import filedialog
 
 import csv
 
+from string import Template
+import urllib.parse
+
 import sys
 import os
 import os.path
@@ -172,15 +175,6 @@ if __name__ == '__main__':
 	# esta ahora, ni hablar de que pasara cuando se quieran usar *verdaderas*
 	# tablas de datos...
 	
-	#~ eig_out = linalg.eig(matrix)
-	
-	#~ # Es posible que, trabajando con datos reales, no tengamos un valor 1.
-	#~ # Esto arma un "rango de error" de +/-0.1
-	#~ idx_vec = np.where(np.abs(eig_out[0] - 1) < 0.1)
-	
-	#~ # steady vector
-	#~ steady_vector = eig_out[1][:,idx_vec].flatten()
-	
 	D, V = linalg.eig(matrix)
 	
 	V = V.T
@@ -190,8 +184,38 @@ if __name__ == '__main__':
 	
 	steady_vector = V[near(D, 1.0)][0]
 	
-	plt.pie(steady_vector, labels=sorted(marcas, key=lambda marca: marcas[marca]), autopct='%1.1f%%')
+	# Labels para los graficos
+	labels = sorted(marcas, key=lambda marca: marcas[marca])
+	
+	plt.pie(steady_vector, labels=labels, autopct='%1.1f%%')
 	plt.savefig( os.path.join(REPORT_ROOT, 'img', 'alalarga.png') )
 	
+	# Migracion: A donde van los clientes de cada marca
+	plantillaDict = {'migracion': ''}
+	
+	for i, row in enumerate(matrix):
+		plantillaDict['migracion'] += '\n<h3>Marca: {}</h3>\n'.format(indices[i])
+		
+		imgPath = os.path.join( os.path.basename(REPORT_ROOT), 'img', '{}-migracion.png'.format( indices[i] ) )
+		
+		relevant = np.where(row != 0)
+		
+		rowLabels = []
+		for i in relevant[0]:
+			rowLabels.append(indices[i])
+		
+		plt.clf()
+		plt.pie(row[relevant], labels=rowLabels, autopct='%1.1f%%')
+		plt.savefig( os.path.join(os.path.dirname(REPORT_ROOT), imgPath) )
+		
+		plantillaDict['migracion'] += '<center><img src=img/{}></center>\n'.format( urllib.parse.quote_plus(os.path.basename(imgPath)) )
+	
+	
+	# Create report html
+	with open( os.path.join('templates', 'html', 'reporte.html') ) as templateF:
+		template = Template(templateF.read())
+		
+		with open( os.path.join(REPORT_ROOT, 'reporte.html'), 'w' ) as fout:
+			fout.write( template.substitute(plantillaDict) )
 	
 	
